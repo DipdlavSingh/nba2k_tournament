@@ -3,6 +3,13 @@ import { logout } from "@/app/actions/auth";
 import { Avatar } from "./Avatar";
 import type { Viewer } from "@/lib/session";
 
+const LINKS = [
+  ["/#standings", "Standings"],
+  ["/schedule", "Schedule"],
+  ["/#teams", "Teams"],
+  ["/players", "Players"],
+] as const;
+
 export function Nav({ viewer, title }: { viewer: Viewer; title: string }) {
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-ink/85 backdrop-blur">
@@ -14,9 +21,11 @@ export function Nav({ viewer, title }: { viewer: Viewer; title: string }) {
           <span className="hidden font-display text-xl leading-none sm:block">{title}</span>
         </Link>
         <nav className="ml-auto flex items-center gap-1 text-sm font-extrabold uppercase italic tracking-wider sm:gap-2">
-          <Link href="/#standings" className="hidden px-2 py-1 hover:text-gold sm:block">Standings</Link>
-          <Link href="/schedule" className="px-2 py-1 hover:text-gold">Schedule</Link>
-          <Link href="/#teams" className="hidden px-2 py-1 hover:text-gold sm:block">Teams</Link>
+          {LINKS.map(([href, label]) => (
+            <Link key={href} href={href} className="hidden px-2 py-1 hover:text-gold sm:block">
+              {label}
+            </Link>
+          ))}
           {viewer?.role === "admin" ? (
             <>
               <Link href="/admin" className="btn btn-gold btn-sm">Admin</Link>
@@ -42,6 +51,14 @@ export function Nav({ viewer, title }: { viewer: Viewer; title: string }) {
           )}
         </nav>
       </div>
+      {/* Phones: page links get their own row */}
+      <nav className="flex justify-around border-t border-line px-2 py-1.5 text-xs font-extrabold uppercase italic tracking-wider sm:hidden">
+        {LINKS.map(([href, label]) => (
+          <Link key={href} href={href} className="px-2 py-1 hover:text-gold">
+            {label}
+          </Link>
+        ))}
+      </nav>
     </header>
   );
 }
