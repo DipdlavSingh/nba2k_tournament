@@ -1,26 +1,257 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --color-ink: #05060a;
+  --color-panel: #0e1119;
+  --color-panel-2: #151a26;
+  --color-line: #252c3e;
+  --color-accent: #ff2d46;
+  --color-accent-2: #ff7a1a;
+  --color-gold: #ffc629;
+  --color-ice: #4fd1ff;
+  --color-mute: #8b93a7;
+  --color-win: #34e08a;
+  --font-display: var(--font-anton), Impact, sans-serif;
+  --font-body: var(--font-barlow), "Arial Narrow", sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: dark;
+  background: var(--color-ink);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body);
+  color: #eef1f7;
+  background:
+    radial-gradient(1200px 600px at 85% -10%, rgba(255, 45, 70, 0.22), transparent 60%),
+    radial-gradient(900px 500px at -10% 10%, rgba(79, 209, 255, 0.12), transparent 60%),
+    repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.018) 0 2px, transparent 2px 14px),
+    var(--color-ink);
+  background-attachment: fixed;
+}
+
+/* Faint court lines behind everything */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.07;
+  background: url("/court.svg") center 120px / min(1400px, 140vw) no-repeat;
+}
+
+@layer components {
+.font-display {
+  font-family: var(--font-display);
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+/* Synthetic italics overhang the box; keep truncated names from clipping the last letter. */
+.font-display.truncate {
+  padding-right: 0.15em;
+}
+
+/* Angular 2K-style panel with clipped corners */
+.panel {
+  position: relative;
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 40%),
+    var(--color-panel);
+  border: 1px solid var(--color-line);
+  clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 22px 100%, 0 calc(100% - 22px));
+}
+.panel::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 120px;
+  height: 3px;
+  background: linear-gradient(90deg, var(--color-accent), var(--color-accent-2));
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-style: italic;
+  text-transform: uppercase;
+  font-size: clamp(1.6rem, 3vw, 2.25rem);
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.section-title::before {
+  content: "";
+  width: 10px;
+  height: 1.1em;
+  background: linear-gradient(180deg, var(--color-accent), var(--color-accent-2));
+  transform: skewX(-18deg);
+}
+
+.btn {
+  --cut: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.4rem;
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.95rem;
+  clip-path: polygon(var(--cut) 0, 100% 0, calc(100% - var(--cut)) 100%, 0 100%);
+  transition: filter 0.15s, transform 0.15s;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:hover {
+  filter: brightness(1.15);
+  transform: translateY(-1px);
+}
+.btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.btn-primary {
+  background: linear-gradient(100deg, var(--color-accent), var(--color-accent-2));
+  color: white;
+  box-shadow: 0 0 24px rgba(255, 45, 70, 0.35);
+}
+.btn-gold {
+  background: linear-gradient(100deg, #ffd84d, #f5a400);
+  color: #1a1200;
+}
+.btn-ghost {
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+}
+.btn-danger {
+  background: rgba(255, 45, 70, 0.15);
+  color: #ff8090;
+}
+.btn-sm {
+  --cut: 8px;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.8rem;
+}
+
+.field-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-mute);
+  margin-bottom: 0.3rem;
+}
+.input {
+  width: 100%;
+  background: #080a10;
+  border: 1px solid var(--color-line);
+  border-bottom: 2px solid #343c52;
+  padding: 0.55rem 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.input:focus {
+  border-bottom-color: var(--color-accent);
+  box-shadow: 0 6px 18px -10px rgba(255, 45, 70, 0.8);
+}
+select.input option {
+  background: #0e1119;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.07);
+  color: #cdd3e1;
+  clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+}
+
+.stat-num {
+  font-family: var(--font-display);
+  font-style: italic;
+  line-height: 1;
+}
+
+.glow-text {
+  text-shadow: 0 0 30px rgba(255, 45, 70, 0.55);
+}
+.outline-text {
+  color: transparent;
+  -webkit-text-stroke: 2px rgba(255, 255, 255, 0.18);
+}
+
+/* Leaderboard */
+.lb-table th {
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-mute);
+  font-weight: 800;
+  padding: 0.6rem 0.5rem;
+  white-space: nowrap;
+}
+.lb-table td {
+  padding: 0.7rem 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.lb-table tbody tr {
+  transition: background 0.15s;
+}
+.lb-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.035);
+}
+.lb-table tr.finals-line td {
+  border-bottom: 2px dashed rgba(255, 198, 41, 0.6);
+}
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rise {
+  animation: rise 0.5s ease-out both;
+}
+
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.spin-slow {
+  animation: spin-slow 30s linear infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .spin-slow {
+    animation: none;
+  }
 }
