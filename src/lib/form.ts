@@ -55,6 +55,15 @@ export function validAvatar(value: string): string {
   return value;
 }
 
+const BANNER_PREFIX = /^data:image\/(jpeg|webp);base64,[A-Za-z0-9+/=]+$/;
+
+export function validBanner(value: string): string {
+  if (!BANNER_PREFIX.test(value) || value.length > 1_800_000) {
+    throw new UserError("That banner image could not be used. Try a smaller JPG or PNG.");
+  }
+  return value;
+}
+
 export function validUsername(raw: string): string {
   const u = raw.toLowerCase();
   if (!/^[a-z0-9_]{3,20}$/.test(u)) {

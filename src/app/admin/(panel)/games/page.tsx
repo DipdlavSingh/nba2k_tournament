@@ -1,9 +1,24 @@
 import { addGame, createFinals, deleteGame, generateSchedule, updateGame } from "@/app/actions/admin";
-import { DateTimeInput, SubmitButton } from "@/components/client";
+import Link from "next/link";
+import { BannerPicker, DateTimeInput, SubmitButton } from "@/components/client";
 import { Field, Flash, Panel } from "@/components/ui";
 import { loadTournament, sortGames } from "@/lib/data";
 import { requireAdmin } from "@/lib/session";
+import { bannerSrc, bannerState, type BannerState } from "@/lib/banners";
 import type { Game, Team } from "@/lib/types";
+
+const BANNER_CHIP: Record<BannerState, [string, string] | null> = {
+  none: null,
+  off: ["Banner off", ""],
+  active: ["Banner live", "bg-win/20 text-win"],
+  expired: ["Banner expired", "bg-accent/20 text-[#ff8090]"],
+};
+
+const FILTERS = [
+  ["", "All games"],
+  ["active", "Live banners"],
+  ["any", "Any banner"],
+] as const;
 
 function TeamOptions({ teams }: { teams: Team[] }) {
   return teams.map((t) => (
@@ -11,13 +26,14 @@ function TeamOptions({ teams }: { teams: Team[] }) {
   ));
 }
 
-function GameEditor({ game, teams }: { game: Game; teams: Team[] }) {
+function GameEditor({ game, teams, filter }: { game: Game; teams: Team[]; filter: string }) {
   return (
     <form
       action={updateGame}
       className={`grid items-end gap-3 border-t border-line px-4 py-4 md:grid-cols-[repeat(14,minmax(0,1fr))] ${game.status === "final" ? "bg-win/[0.03]" : ""}`}
     >
       <input type="hidden" name="id" value={game.id} />
+      <input type="hidden" name="filter" value={filter} />
       <div className="md:col-span-1">
         <Field label={game.stage === "final" ? "Game" : "Round"}>
           <input name="round" type="number" min={1} className="input" defaultValue={game.round} />
@@ -60,12 +76,39 @@ function GameEditor({ game, teams }: { game: Game; teams: Team[] }) {
           </select>
         </Field>
       </div>
-      <div className="md:col-span-8">
+      <div className="md:col-span-14">
         <Field label="Notes (optional, shown publicly)">
           <input name="notes" className="input" defaultValue={game.notes ?? ""} maxLength={140} placeholder="e.g. Forfeit, OT thriller" />
         </Field>
       </div>
-      <div className="flex gap-2 md:col-span-6 md:justify-end">
+      <details className="group md:col-span-14" open={bannerState(game) !== "none"}>
+        <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-bold uppercase tracking-widest text-mute">
+          <span className="group-open:rotate-90 transition">▸</span> Home page banner
+          {BANNER_CHIP[bannerState(game)] ? (
+            <span className={`chip ${BANNER_CHIP[bannerState(game)]![1]}`}>{BANNER_CHIP[bannerState(game)]![0]}</span>
+          ) : null}
+        </summary>
+        <div className="mt-3 grid gap-4 md:grid-cols-[2fr_1fr]">
+          <BannerPicker current={game.banner_version ? bannerSrc(game) : null} name="banner_image" />
+          <div className="space-y-3">
+            <label className="flex items-center gap-3 font-semibold">
+              <input type="checkbox" name="banner_active" defaultChecked={game.banner_active} className="h-5 w-5 accent-[#ff2d46]" />
+              Banner (show on home page)
+            </label>
+            <Field label="Show until (optional)">
+              <DateTimeInput name="banner_until" defaultValue={game.banner_until} />
+            </Field>
+            {game.banner_version ? (
+              <label className="flex items-center gap-3 text-sm font-semibold text-[#ff8090]">
+                <input type="checkbox" name="banner_remove" className="h-4 w-4 accent-[#ff2d46]" />
+                Delete banner image
+              </label>
+            ) : null}
+            <p className="text-xs text-mute">Shown at a 3:1 shape. About 1500×500 px works best. Click Save to apply.</p>
+          </div>
+        </div>
+      </details>
+      <div className="flex gap-2 md:col-span-14 md:justify-end">
         <SubmitButton className="btn btn-primary btn-sm">Save</SubmitButton>
         <SubmitButton className="btn btn-danger btn-sm" formAction={deleteGame} confirm="Delete this game?">
           Delete
@@ -77,12 +120,20 @@ function GameEditor({ game, teams }: { game: Game; teams: Team[] }) {
 
 export default async function AdminGames({ searchParams }: PageProps<"/admin/games">) {
   await requireAdmin();
-  const { ok, err } = (await searchParams) as { ok?: string; err?: string };
+  const { ok, err, banner } = (await searchParams) as { ok?: string; err?: string; banner?: string };
   const t = await loadTournament();
+  const filter = banner === "active" || banner === "any" ? banner : "";
+  const shown = (g: Game) =>
+    filter === "active" ? bannerState(g) === "active" : filter === "any" ? bannerState(g) !== "none" : true;
+  const counts = {
+    "": t.games.length,
+    active: t.games.filter((g) => bannerState(g) === "active").length,
+    any: t.games.filter((g) => bannerState(g) !== "none").length,
+  };
   const rounds = new Map<number, Game[]>();
-  for (const g of sortGames(t.rrGames)) rounds.set(g.round, [...(rounds.get(g.round) ?? []), g]);
+  for (const g of sortGames(t.rrGames).filter(shown)) rounds.set(g.round, [...(rounds.get(g.round) ?? []), g]);
   const seeds = t.finalsSeeds();
-  const finalsGames = t.finals?.games ?? [];
+  const finalsGames = (t.finals?.games ?? []).filter(shown);
 
   return (
     <div className="space-y-6">
@@ -156,8 +207,24 @@ export default async function AdminGames({ searchParams }: PageProps<"/admin/gam
         </form>
       </Panel>
 
-      <h2 className="section-title text-2xl">Enter scores</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="section-title text-2xl">Enter scores & banners</h2>
+        <div className="flex flex-wrap gap-2">
+          {FILTERS.map(([value, label]) => (
+            <Link
+              key={value}
+              href={value ? `/admin/games?banner=${value}` : "/admin/games"}
+              className={`btn btn-sm ${filter === value ? "btn-primary" : "btn-ghost"}`}
+            >
+              {label} ({counts[value]})
+            </Link>
+          ))}
+        </div>
+      </div>
       {!t.games.length ? <p className="text-mute">No games yet.</p> : null}
+      {t.games.length && !rounds.size && !finalsGames.length ? (
+        <p className="text-mute">{filter === "active" ? "No banners are live right now." : "No games have a banner image yet."}</p>
+      ) : null}
       {[...rounds].map(([round, games]) => (
         <div key={round} className="panel p-0">
           <div className="flex items-center justify-between px-4 py-3">
@@ -166,7 +233,7 @@ export default async function AdminGames({ searchParams }: PageProps<"/admin/gam
               {games.filter((g) => g.status === "final").length}/{games.length} final
             </span>
           </div>
-          {games.map((g) => <GameEditor key={g.id} game={g} teams={t.teams} />)}
+          {games.map((g) => <GameEditor key={g.id} game={g} teams={t.teams} filter={filter} />)}
         </div>
       ))}
       {finalsGames.length ? (
@@ -177,7 +244,7 @@ export default async function AdminGames({ searchParams }: PageProps<"/admin/gam
               <span className="chip bg-gold text-black">Champion: {t.teamById.get(t.finals.champion)?.name}</span>
             ) : null}
           </div>
-          {finalsGames.map((g) => <GameEditor key={g.id} game={g} teams={t.teams} />)}
+          {finalsGames.map((g) => <GameEditor key={g.id} game={g} teams={t.teams} filter={filter} />)}
         </div>
       ) : null}
     </div>

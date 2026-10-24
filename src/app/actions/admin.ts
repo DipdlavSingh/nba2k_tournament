@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import { store, UserError } from "@/lib/store";
 import { getSettings, loadTournament } from "@/lib/data";
 import { nbaTeam } from "@/lib/nba";
-import { optInt, optStr, runAction, str, validPassword, validUsername } from "@/lib/form";
+import { optInt, optStr, runAction, str, validBanner, validPassword, validUsername } from "@/lib/form";
 import { requireAdmin } from "@/lib/session";
 import { roundRobinPairings } from "@/lib/standings";
 import type { Game, GameStage, Team } from "@/lib/types";
@@ -196,6 +196,9 @@ function newGame(stage: GameStage, round: number, home: string, away: string, at
     away_score: null,
     status: "scheduled",
     notes: null,
+    banner_active: false,
+    banner_until: null,
+    banner_version: null,
     created_at: now(),
   };
 }
@@ -236,9 +239,15 @@ export async function addGame(fd: FormData) {
   });
 }
 
+/** Keeps the admin's banner filter across a save or delete. */
+function gamesPath(fd: FormData) {
+  const filter = str(fd, "filter");
+  return filter === "active" || filter === "any" ? `/admin/games?banner=${filter}` : "/admin/games";
+}
+
 export async function updateGame(fd: FormData) {
   await requireAdmin();
-  await runAction("/admin/games", async () => {
+  await runAction(gamesPath(fd), async () => {
     const id = str(fd, "id");
     const home = str(fd, "home_team_id");
     const away = str(fd, "away_team_id");
@@ -250,6 +259,7 @@ export async function updateGame(fd: FormData) {
       if (homeScore === null || awayScore === null) throw new UserError("Enter both scores to mark a game final.");
       if (homeScore === awayScore) throw new UserError("NBA 2K games can't end in a tie. Check the score.");
     }
+    const banner = await saveBanner(fd, id);
     await store.update("games", id, {
       home_team_id: home,
       away_team_id: away,
@@ -259,14 +269,38 @@ export async function updateGame(fd: FormData) {
       away_score: awayScore,
       status,
       notes: optStr(fd, "notes", 140),
+      ...banner,
     });
     return status === "final" ? "Final score saved." : "Game saved.";
   });
 }
 
+/** Applies the banner part of the game form: new image, removal, the checkbox and end date. */
+async function saveBanner(fd: FormData, gameId: string): Promise<Partial<Game>> {
+  const game = (await store.list("games")).find((g) => g.id === gameId);
+  if (!game) throw new UserError("Game not found.");
+  const image = str(fd, "banner_image", 2_000_000);
+  const remove = fd.get("banner_remove") === "on";
+  let version = game.banner_version ?? null;
+
+  if (image) {
+    const existing = await store.get("banners", gameId);
+    if (existing) await store.update("banners", gameId, { image: validBanner(image) });
+    else await store.insert("banners", { id: gameId, image: validBanner(image), created_at: now() });
+    version = now();
+  } else if (remove && version) {
+    await store.remove("banners", gameId);
+    version = null;
+  }
+
+  const active = fd.get("banner_active") === "on" && !(remove && !image);
+  if (active && !version) throw new UserError("Upload a banner image before turning the banner on.");
+  return { banner_active: active, banner_until: isoOrNull(fd, "banner_until"), banner_version: version };
+}
+
 export async function deleteGame(fd: FormData) {
   await requireAdmin();
-  await runAction("/admin/games", async () => {
+  await runAction(gamesPath(fd), async () => {
     await store.remove("games", str(fd, "id"));
     return "Game deleted.";
   });

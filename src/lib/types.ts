@@ -33,6 +33,20 @@ export type Game = {
   away_score: number | null;
   status: GameStatus;
   notes: string | null;
+  /** Admin ticked "banner": promote this game on the home page. */
+  banner_active: boolean;
+  /** Optional time after which the banner stops showing. */
+  banner_until: string | null;
+  /** When the banner image was last uploaded; null means no image. Also busts the image cache. */
+  banner_version: string | null;
+  created_at: string;
+};
+
+/** Banner image for a game, kept apart from games so page loads don't pull every image. */
+export type Banner = {
+  /** Same as the game id. */
+  id: string;
+  image: string;
   created_at: string;
 };
 
@@ -53,6 +67,7 @@ export type TableMap = {
   players: Player;
   teams: Team;
   games: Game;
+  banners: Banner;
   settings: Settings;
 };
 export type TableName = keyof TableMap;

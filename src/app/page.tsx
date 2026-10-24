@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { BannerCarousel } from "@/components/BannerCarousel";
 import { HeroArt } from "@/components/HeroArt";
 import { Leaderboard } from "@/components/Leaderboard";
 import { TeamBadge } from "@/components/TeamBadge";
 import { GameCard, Panel, TeamCard } from "@/components/ui";
 import { loadTournament, sortGames } from "@/lib/data";
 import { isPlayed } from "@/lib/standings";
+import { bannerSrc, bannerState } from "@/lib/banners";
 import type { Team } from "@/lib/types";
 
 const PHASE_LABEL = {
@@ -22,9 +24,16 @@ export default async function Home() {
   const recent = sortGames(t.games.filter(isPlayed)).reverse().slice(0, 4);
   const champion = t.finals?.champion ? t.teamById.get(t.finals.champion) : undefined;
   const recordOf = new Map(t.standings.map((r) => [r.team.id, r]));
+  const banners = sortGames(t.games.filter((g) => bannerState(g) === "active")).map((g) => ({
+    id: g.id,
+    src: bannerSrc(g),
+    alt: `${t.teamById.get(g.away_team_id)?.name ?? "TBD"} vs ${t.teamById.get(g.home_team_id)?.name ?? "TBD"}`,
+  }));
 
   return (
     <div className="space-y-12">
+      {banners.length ? <BannerCarousel slides={banners} /> : null}
+
       {/* HERO */}
       <section className="panel rise relative overflow-hidden p-0">
         <div className="grid items-center gap-6 md:grid-cols-[1.15fr_1fr]">

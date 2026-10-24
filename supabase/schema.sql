@@ -34,6 +34,15 @@ create table if not exists games (
   away_score int,
   status text not null default 'scheduled' check (status in ('scheduled', 'final')),
   notes text,
+  banner_active boolean not null default false,
+  banner_until timestamptz,
+  banner_version timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists banners (
+  id uuid primary key references games(id) on delete cascade,
+  image text not null, -- JPEG data URL, resized in the browser
   created_at timestamptz not null default now()
 );
 
@@ -50,4 +59,5 @@ create table if not exists settings (
 alter table teams enable row level security;
 alter table players enable row level security;
 alter table games enable row level security;
+alter table banners enable row level security;
 alter table settings enable row level security;

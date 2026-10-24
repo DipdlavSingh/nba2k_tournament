@@ -12,6 +12,7 @@ A website for a 2v2 NBA 2K26 tournament. Teams of two play a single round robin,
   - edits or deletes any player, team or game
   - resets passwords
   - posts an announcement banner
+  - promotes games with banner images: a carousel at the top of the home page, with an optional end date per banner and a filter to show only games with banners
   - opens or closes registration
 
 ## Tiebreakers
@@ -49,6 +50,8 @@ If no Supabase variables are set, data is saved to `.data/db.json`.
    - `ADMIN_PASSWORD`
    - `SESSION_SECRET` (a long random string)
 4. Deploy. Share the `*.vercel.app` URL with players and log in at `/admin`.
+
+**Already deployed before game banners were added?** Run [`supabase/migrations/002_game_banners.sql`](supabase/migrations/002_game_banners.sql) once in the Supabase SQL Editor before deploying the new version.
 
 Notes:
 

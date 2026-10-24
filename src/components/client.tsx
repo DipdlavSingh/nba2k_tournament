@@ -125,3 +125,62 @@ export function AvatarPicker({ current, name }: { current: string | null; name: 
     </div>
   );
 }
+
+const BANNER_MAX_WIDTH = 1800;
+const BANNER_MAX_CHARS = 1_200_000;
+
+/**
+ * Picks a banner image and shrinks it to a JPEG in the browser (aspect ratio kept).
+ * The new image is sent with the surrounding form; nothing is saved until it is submitted.
+ */
+export function BannerPicker({ current, name }: { current: string | null; name: string }) {
+  const [data, setData] = useState("");
+  const [error, setError] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function onFile(file: File | undefined) {
+    setError("");
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return setError("Please choose an image file.");
+    try {
+      const bitmap = await createImageBitmap(file);
+      let width = Math.min(bitmap.width, BANNER_MAX_WIDTH);
+      for (let attempt = 0; attempt < 6; attempt++) {
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = Math.round((bitmap.height / bitmap.width) * width);
+        const ctx = canvas.getContext("2d")!;
+        ctx.fillStyle = "#05060a";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        const url = canvas.toDataURL("image/jpeg", 0.82);
+        if (url.length <= BANNER_MAX_CHARS) return setData(url);
+        width = Math.round(width * 0.8);
+      }
+      setError("That image is too large even after shrinking. Try a smaller one.");
+    } catch {
+      setError("Couldn't read that image. Try a JPG or PNG.");
+    }
+  }
+
+  const preview = data || current;
+  return (
+    <div className="space-y-2">
+      <div className="relative aspect-[3/1] w-full overflow-hidden border border-line bg-panel-2">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {preview ? <img src={preview} alt="Banner preview" className="h-full w-full object-cover" /> : (
+          <div className="grid h-full place-items-center text-xs font-bold uppercase tracking-widest text-mute">
+            No banner image
+          </div>
+        )}
+        {data ? <span className="chip absolute left-2 top-2 bg-gold text-black">New · save to apply</span> : null}
+      </div>
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
+      <input type="hidden" name={name} value={data} />
+      <button type="button" className="btn btn-ghost btn-sm" onClick={() => fileRef.current?.click()}>
+        {preview ? "Replace image" : "Upload image"}
+      </button>
+      {error ? <p className="text-sm text-accent">{error}</p> : null}
+    </div>
+  );
+}

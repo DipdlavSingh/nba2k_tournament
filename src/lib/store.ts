@@ -16,6 +16,7 @@ type Row<T extends TableName> = TableMap[T];
 
 interface Store {
   list<T extends TableName>(table: T): Promise<Row<T>[]>;
+  get<T extends TableName>(table: T, id: string): Promise<Row<T> | null>;
   insert<T extends TableName>(table: T, row: Row<T>): Promise<void>;
   update<T extends TableName>(table: T, id: string, patch: Partial<Row<T>>): Promise<void>;
   remove(table: TableName, id: string): Promise<void>;
@@ -35,6 +36,11 @@ class SupabaseStore implements Store {
     const { data, error } = await this.db.from(table).select("*").order("created_at", { ascending: true });
     if (error) throw friendly(error);
     return (data ?? []) as Row<T>[];
+  }
+  async get<T extends TableName>(table: T, id: string) {
+    const { data, error } = await this.db.from(table).select("*").eq("id", id).maybeSingle();
+    if (error) throw friendly(error);
+    return (data ?? null) as Row<T> | null;
   }
   async insert<T extends TableName>(table: T, row: Row<T>) {
     const { error } = await this.db.from(table).insert(row);
@@ -57,10 +63,11 @@ class FileStore implements Store {
   private queue: Promise<unknown> = Promise.resolve();
 
   private async read(): Promise<FileData> {
+    const empty: FileData = { players: [], teams: [], games: [], banners: [], settings: [] };
     try {
-      return JSON.parse(await fs.readFile(this.file, "utf8"));
+      return { ...empty, ...JSON.parse(await fs.readFile(this.file, "utf8")) };
     } catch {
-      return { players: [], teams: [], games: [], settings: [] };
+      return empty;
     }
   }
   private mutate(fn: (data: FileData) => void): Promise<void> {
@@ -76,6 +83,9 @@ class FileStore implements Store {
   async list<T extends TableName>(table: T) {
     await this.queue;
     return ((await this.read())[table] ?? []) as Row<T>[];
+  }
+  async get<T extends TableName>(table: T, id: string) {
+    return (await this.list(table)).find((r) => r.id === id) ?? null;
   }
   insert<T extends TableName>(table: T, row: Row<T>) {
     return this.mutate((d) => {
@@ -96,6 +106,10 @@ class FileStore implements Store {
       if (table === "teams") {
         d.games = d.games.filter((g) => g.home_team_id !== id && g.away_team_id !== id);
         d.players = d.players.map((p) => (p.team_id === id ? { ...p, team_id: null } : p));
+      }
+      if (table === "teams" || table === "games") {
+        const gameIds = new Set(d.games.map((g) => g.id));
+        d.banners = d.banners.filter((b) => gameIds.has(b.id));
       }
     });
   }
